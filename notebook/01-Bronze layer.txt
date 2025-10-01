@@ -1,0 +1,78 @@
+
+from pyspark.sql import SparkSession
+from pyspark.sql.types import StructType, StructField, StringType, DoubleType, IntegerType
+from pyspark.sql.functions import col, from_json
+
+
+order_schema = StructType([
+    StructField("order_id", StringType(), True),
+    StructField("timestamp", StringType(), True),
+    StructField("customer_id", StringType(), True),
+    StructField("product_id", StringType(), True),
+    StructField("category", StringType(), True),
+    StructField("price", DoubleType(), True),
+    StructField("quantity", IntegerType(), True),
+    StructField("total_amount", DoubleType(), True),
+    StructField("city", StringType(), True),
+    StructField("state", StringType(), True),
+    StructField("country", StringType(), True),
+    StructField("latitude", StringType(), True),  # Consider DoubleType if used numerically
+    StructField("longitude", StringType(), True), # Same here
+    StructField("delivery_status", StringType(), True),
+])
+
+
+
+ event_hub_namespace = dbutils.secrets.get(scope="azure-secrets", key="event-hub-namespace")
+ event_hub_name = dbutils.secrets.get(scope="azure-secrets", key="event-hub-name")
+ event_hub_conn_str = dbutils.secrets.get(scope="azure-secrets", key="event-hub-conn-string")
+
+
+if not all([event_hub_namespace, event_hub_name, event_hub_conn_str]):
+    raise ValueError(
+        "Missing Event Hubs configuration. "
+        "Set EVENT_HUB_NAMESPACE, EVENT_HUB_NAME, and EVENT_HUB_CONNECTION_STRING."
+    )
+
+event_hubs_config = {
+    "kafka.bootstrap.servers": f"{event_hub_namespace}:9093",
+    "subscribe": event_hub_name,
+    "kafka.security.protocol": "SASL_SSL",
+    "kafka.sasl.mechanism": "PLAIN",
+    "kafka.sasl.jaas.config": (
+        'kafkashaded.org.apache.kafka.common.security.plain.PlainLoginModule '
+        'required username="$ConnectionString" '
+        f'password="{event_hub_conn_str}";'
+    ),
+    "startingOffsets": "latest",
+    "failOnDataLoss": "false"
+}
+
+
+raw_stream = (
+    spark.readStream
+    .format("kafka")
+    .options(**event_hubs_config)
+    .load()
+)
+
+
+parsed_stream = (
+    raw_stream
+    .selectExpr("CAST(value AS STRING) as json_string")
+    .select(from_json(col("json_string"), order_schema).alias("data"))
+    .select("data.*")
+)
+
+
+query = (
+    parsed_stream.writeStream
+    .format("delta")
+    .outputMode("append")
+    .option("checkpointLocation", f"{bronze_base_path}/_checkpoint")
+    .trigger(processingTime="30 seconds")  # Optional: control micro-batch frequency
+    .start(bronze_base_path)
+)
+
+# Keep streaming running (in notebook or job)
+query.awaitTermination()
