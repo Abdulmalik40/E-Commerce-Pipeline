@@ -6,7 +6,7 @@ from datetime import datetime
 from faker import Faker
 from kafka import KafkaProducer
 
-# Load secrets from environment variables (NOT from code!)
+# Load secrets from environment variables
 BOOTSTRAP_SERVERS = os.getenv('EVENT_HUB_BOOTSTRAP_SERVER')
 EVENT_HUB_CONNECTION_STRING = os.getenv('EVENT_HUB_CONNECTION_STRING')
 EVENT_HUB_NAME = os.getenv('EVENT_HUB_NAME')
@@ -70,4 +70,5 @@ if __name__ == "__main__":
         print("\nStopping producer...")
     finally:
         producer.flush()
+
         producer.close()
