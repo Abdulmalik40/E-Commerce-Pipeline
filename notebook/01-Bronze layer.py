@@ -16,8 +16,8 @@ order_schema = StructType([
     StructField("city", StringType(), True),
     StructField("state", StringType(), True),
     StructField("country", StringType(), True),
-    StructField("latitude", StringType(), True),  # Consider DoubleType if used numerically
-    StructField("longitude", StringType(), True), # Same here
+    StructField("latitude", StringType(), True),  
+    StructField("longitude", StringType(), True), 
     StructField("delivery_status", StringType(), True),
 ])
 
@@ -70,9 +70,9 @@ query = (
     .format("delta")
     .outputMode("append")
     .option("checkpointLocation", f"{bronze_base_path}/_checkpoint")
-    .trigger(processingTime="30 seconds")  # Optional: control micro-batch frequency
+    .trigger(processingTime="30 seconds") 
     .start(bronze_base_path)
 )
 
-# Keep streaming running (in notebook or job)
 query.awaitTermination()
+
